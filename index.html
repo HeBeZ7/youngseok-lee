@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>YoungSeok Lee</title>
+  <meta name="description" content="YoungSeok Lee, founder of ASIV. Selected work, background and contact.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+  <meta property="og:title" content="YoungSeok Lee">
+  <meta property="og:description" content="Founder of ASIV. Selected work, background and contact.">
+  <meta property="og:image" content="assets/scene/moon-scene.webp">
+
+  <script>
+    /* Decide before first paint whether the opening plays:
+       once per tab session, never for #deep-links or reduced motion.
+       ?intro=1 forces it (for review). */
+    (function () {
+      var d = document.documentElement;
+      d.classList.add('js');
+      var play = false;
+      try {
+        var force = /[?&]intro=1\b/.test(location.search);
+        var rm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var deep = location.hash.length > 1;
+        var seen = false;
+        try { seen = sessionStorage.getItem('ysl.intro.seen') === '1'; } catch (e) {}
+        play = force || (!seen && !rm && !deep);
+      } catch (e) { play = false; }
+      var gl2 = !!window.WebGL2RenderingContext;
+      function preload(href, type) {
+        var l = document.createElement('link');
+        l.rel = 'preload'; l.as = 'image'; l.href = href;
+        if (type) l.type = type;
+        document.head.appendChild(l);
+      }
+      if (play) d.classList.add('intro');
+      // assume the 3D hero; js/intro.js removes this if it cannot start
+      if (gl2) d.classList.add('gl');
+      // the painting is the hero only without WebGL2 (js/space.js); otherwise it
+      // is just the fallback and loads at low priority (the 3D sprites load later
+      // from space.js, also at low priority)
+      if (!gl2) {
+        var l = document.createElement('link');
+        l.rel = 'preload'; l.as = 'image'; l.type = 'image/webp';
+        l.href = 'assets/scene/moon-scene.webp';
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+        if (play) preload('assets/scene/moon-detail.webp', 'image/webp');
+      }
+      // safety net: if the intro script failed to load or threw, show the
+      // plain page instead of leaving it in the opening state
+      window.addEventListener('load', function () {
+        if (!window.__intro) {
+          d.classList.remove('intro', 'js', 'gl');
+          d.classList.add('settled');
+        }
+      });
+    })();
+  </script>
+
+  <link rel="preload" href="assets/brand/asiv-logo-stacked.webp" as="image" type="image/webp">
+  <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <button class="skip" id="skip" type="button">Skip intro</button>
+
+  <header class="site-header" id="site-header">
+    <a class="brand" href="#top">YoungSeok Lee</a>
+    <nav class="nav" aria-label="Main">
+      <ul>
+        <li><a href="#work">Work</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <h1 class="hero__title" id="hero-title">YoungSeok Lee</h1>
+
+    <div class="stage" id="stage" role="img"
+         aria-label="Illustration: a boy with a yellow scarf and a fox sit side by side on a small moon, seen from behind, next to a green tree, in black space.">
+      <img class="cam cam--scene" id="cam-scene" src="assets/scene/moon-scene.webp"
+           width="1672" height="941" alt="" decoding="async" loading="lazy" fetchpriority="low" draggable="false">
+      <img class="cam cam--detail" id="cam-detail" data-src="assets/scene/moon-detail.webp"
+           width="1200" height="1200" alt="" decoding="async" draggable="false">
+      <div class="grain" id="grain" aria-hidden="true"></div>
+      <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+      <div class="glints" id="glints" aria-hidden="true"></div>
+    </div>
+
+    <div class="intro-layer" aria-hidden="true">
+      <div class="intro-mark" id="intro-mark">
+        <img class="intro-mark__logo" id="intro-logo" src="assets/brand/asiv-logo-stacked.webp"
+             width="640" height="515" alt="" decoding="async">
+        <span class="intro-mark__logo-text">ASIV</span>
+        <span class="intro-mark__name">YoungSeok Lee</span>
+      </div>
+    </div>
+
+    <a class="scroll-hint" id="scroll-hint" href="#work">
+      <span>Scroll to explore</span>
+      <i aria-hidden="true"></i>
+    </a>
+  </section>
+
+  <div class="drift" aria-hidden="true"></div>
+
+  <main id="main">
+    <noscript>
+      <section class="section"><div class="wrap">
+        <p>This page needs JavaScript to show the projects.</p>
+      </div></section>
+    </noscript>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap site-footer__inner">
+      <span>© <span id="year">2026</span> YoungSeok Lee</span>
+      <a href="#top">Back to top</a>
+    </div>
+  </footer>
+
+  <script src="js/content.js"></script>
+  <script src="js/scene-config.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/space.js"></script>
+  <script src="js/intro.js"></script>
+</body>
+</html>
