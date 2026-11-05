@@ -841,7 +841,8 @@
     var lastTs = t0;
     var debugE = null, debugTime = null;
     var stats = { frames: 0, last: 0, fps: 0, ms: 0, acc: 0, n: 0 };
-    var timing = { created: performance.now() };
+    var timing = { created: performance.now(), long: [] };
+    function slow(label, t1) { var d = performance.now() - t1; if (d > 30) timing.long.push(label + ' ' + Math.round(d) + 'ms @' + Math.round(t1)); }
 
     var size = { w: 1, h: 1, bw: 1, bh: 1, dpr: 1 };
     var F = null, path = null;
@@ -881,7 +882,8 @@
               }
             }
           }
-          try { pending.forEach(finishProgram); pending = []; resolve(); } catch (err) { reject(err); }
+          var tq = performance.now();
+          try { pending.forEach(finishProgram); pending = []; slow('finishPrograms', tq); resolve(); } catch (err) { reject(err); }
         }
         check();
       });
@@ -1018,7 +1020,9 @@
         function next() {
           if (destroyed || failed) { gl.deleteFramebuffer(fb); return reject(new Error('SpaceScene: stopped')); }
           try {
+            var tb = performance.now();
             chunk(); if (k < 24) chunk();
+            slow('bake ' + k, tb);
             if (k < 24) { requestAnimationFrame(next); return; }
             gl.deleteFramebuffer(fb);
             [macroG, macroM].forEach(function (t) { gl.bindTexture(gl.TEXTURE_CUBE_MAP, t); gl.generateMipmap(gl.TEXTURE_CUBE_MAP); });
@@ -1307,8 +1311,25 @@
         : loadImage(fig.src, true);
       return Promise.all([img, fig.wsrc ? loadData(fig.wsrc) : Promise.resolve(null)]).then(function (imgs) {
         if (destroyed || failed) return;
+        // uploading while the GPU process is still compiling shaders blocks the main
+        // thread for the length of that compile: wait until the scene is ready (GPU idle)
+        uploadQ.push(function () { uploadSprite(fig, imgs); });
+        if (isReady) kick();
+      });
+    }
+
+    var uploadQ = [];
+    function drainUpload() {
+      if (!isReady || !uploadQ.length) return;
+      uploadQ.shift()();
+    }
+
+    function uploadSprite(fig, imgs) {
+      {
         fig.W = fig.W || imgs[0].naturalWidth; fig.H = fig.H || imgs[0].naturalHeight;
+        var tu = performance.now();
         fig.tex = texture(imgs[0], true);
+        slow('upload ' + fig.id, tu);
         if (imgs[1]) fig.wts = texture(imgs[1], false);
         else {
           fig.wts = gl.createTexture();
@@ -1318,9 +1339,9 @@
           textures.push(fig.wts);
         }
         if (imgs[1] && imgs[1].close) imgs[1].close();
-        fig.shownAt = isReady ? performance.now() : -1e9;
-        if (isReady) { heldDrawn = false; kick(); }
-      });
+        fig.shownAt = performance.now();
+        heldDrawn = false;
+      }
     }
 
     /* ---------- framing and path ---------- */
@@ -1786,6 +1807,7 @@
       if (captureDriven) return;
       var t1 = performance.now();
       step(ts);
+      if (uploadQ.length) drainUpload();
       var holding = anim && ts < anim.start && debugE == null;
       if (holding && heldDrawn) { prevFrameTs = 0; warm = 6; frameEMA = 16.7; if (wantLoop()) raf = requestAnimationFrame(frame); return; }
       heldDrawn = !!holding;
@@ -1972,7 +1994,10 @@
         if (destroyed || failed) throw new Error('SpaceScene: stopped');
         K = 1 / PM.rx;
         resize();
-        return warmPrograms();
+        var tw = performance.now();
+        var wp = warmPrograms();
+        slow('warm', tw);
+        return wp;
       }).then(function () {
         timing.warmed = performance.now();
         if (destroyed || failed) throw new Error('SpaceScene: stopped');
@@ -1986,7 +2011,9 @@
         if (destroyed || failed) throw new Error('SpaceScene: stopped');
         if (gl.isContextLost()) throw new Error('SpaceScene: context lost');
         step(performance.now());
+        var tr = performance.now();
         render(performance.now());
+        slow('first render', tr);
         isReady = true;
         if (!opts.manualReveal) canvas.style.opacity = '1';
         requestAnimationFrame(function () {
@@ -2007,6 +2034,7 @@
           if (!isReady || destroyed || failed) return false;
           captureDriven = true;
           if (raf) { cancelAnimationFrame(raf); raf = 0; }
+          while (uploadQ.length) drainUpload();
           step(ms);
           render(ms);
           finishAnim();
