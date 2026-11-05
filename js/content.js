@@ -1,21 +1,19 @@
 /*
  * Site content — the only file you need to edit to update the page.
  *
- *  - todo('…') marks material that has not been provided yet. It renders as a
- *    visible "교체 필요" box, and the browser console lists every open item.
- *    Replace todo('…') with the final text (a string) when it arrives.
+ *  - Every string here is visitor-facing copy. Keep it as approved; do not
+ *    add fields or links that have no confirmed answer (leave them out).
  *  - FACTS holds claims whose wording is fixed. Keep the sentences exactly as
  *    agreed and update numbers/dates here only; every section reads from it.
- *  - Links with an empty url render as "pending" and are not clickable.
  *  - In paragraphs, **text** becomes bold.
+ *  - External links open in a new tab (rel="noopener noreferrer").
  */
 (function () {
   'use strict';
 
-  function todo(hint) { return { todo: hint }; }
-
   var FACTS = {
-    // Date the figures below were last checked. Shown next to them.
+    // Date the figures below were last checked. Shown next to them as
+    // "As of November 6, 2026".
     asOf: '2026-11-06',
 
     interviews: '97 interview sessions.',
@@ -23,7 +21,14 @@
     launch: 'Targeting a November 27, 2026 launch.',
     businessTalks: 'Discussions with several potential business customers.',
 
-    worldcupSales: 'Worldcup Project sold around 70–80 items.'
+    // Separate projects, separate figures. Items, not customers.
+    worldcupSales: 'The project sold around 70–80 items.',
+    hebezSales: 'Our first batch of seven shirts sold out.'
+  };
+
+  var LINKS = {
+    asiv: 'https://www.asiv.ai.kr/',
+    worldcup: 'https://worldcup-project-one.vercel.app/'
   };
 
   window.SITE = {
@@ -36,8 +41,9 @@
         name: 'ASIV',
         featured: true,
         logo: { src: 'assets/brand/asiv-logo-horizontal.webp', width: 588, height: 129 },
-        lede: todo('ASIV를 한두 문장으로: 무엇을, 누구를 위해 만들었는지'),
-        period: todo('기간 (예: 2025 – present)'),
+        role: 'Sole Founder & Builder',
+        period: '2026–Present',
+        lede: 'AI workers for the work between ERP screens.',
         media: [
           {
             src: 'assets/work/asiv-review-step.webp',
@@ -45,101 +51,149 @@
             height: 609,
             // phones show just the review card from the same screenshot
             small: { src: 'assets/work/asiv-review-card.webp', width: 752, height: 434 },
-            alt: 'ASIV screen showing a proposed delivery-date change to purchase order 4500012345, line 20, in SAP S/4HANA. The change is a preview with an "Approve these values and run" button and the note "Waiting for your approval — nothing has been changed." Example data.',
-            caption: 'The review step. A proposed change to an SAP S/4HANA purchase order is shown as a preview, and nothing in the ERP changes until the values are approved. Example data.'
+            alt: 'ASIV console showing a proposed delivery-date change to purchase order 4500012345, line 20, in SAP S/4HANA, previewed with an "Approve these values and run" button and the note "Waiting for your approval — nothing has been changed." Sample data.',
+            caption: 'ASIV console — sample workflow.',
+            zoom: true
           }
         ],
-        // Finished results go in soFar. Goals and open conversations go in
-        // inProgress, so they are never shown as completed.
+        // Finished results go in done. Goals and open conversations go in
+        // open, so they are never shown as completed.
         status: {
-          soFar: [FACTS.interviews, FACTS.waitlist],
-          inProgress: [FACTS.launch, FACTS.businessTalks]
+          done: { label: 'Evidence', items: [FACTS.interviews, FACTS.waitlist] },
+          open: { label: 'In progress', items: [FACTS.launch, FACTS.businessTalks] },
+          asOf: true
         },
-        story: {
-          built: todo('무엇을 만들었는가 — 제품이 실제로 하는 일'),
-          role: todo('내가 직접 맡은 일 — 설계·개발·인터뷰·영업 등 본인이 한 부분'),
-          decisions: todo('부딪힌 문제와 바꾼 결정 — 무엇이 막혔고 어떤 선택을 바꿨는지'),
-          outcome: todo('결과와 배운 점')
-        },
+        story: [
+          { label: 'What I built', text: "I built ASIV's first products to check ERP records and approval documents. I am now developing AI workers that gather context, ask for missing information, execute authorized actions, and verify the result." },
+          { label: 'My contribution', text: "I lead product direction, implementation, testing, and customer discovery. My father, an ERP consultant with more than 17 years of experience, is ASIV's ERP Domain Advisor." },
+          { label: 'Challenge and decision', text: 'An early feature compared two Excel files to identify migration problems, but the first version returned errors. I rebuilt it around an LLM and reworked the original engine into an ontology. Repeated questions and feedback from my father helped me extend the system.' },
+          { label: 'What I learned', text: 'Finding a problem creates another job for the user. I want ASIV to carry more of that remaining work through, rather than stop at an alert.' }
+        ],
         links: [
-          { label: 'Product', url: '' },
-          { label: 'Code', url: '' },
-          { label: 'Demo', url: '' }
+          { label: 'Visit ASIV', url: LINKS.asiv }
         ]
       },
       {
         id: 'worldcup',
         name: 'Worldcup Project',
-        lede: todo('Worldcup Project를 한두 문장으로'),
-        period: todo('기간'),
-        media: [],
-        mediaHint: 'Worldcup Project 실제 사진·화면',
+        role: 'Builder',
+        // period omitted: no confirmed date
+        lede: 'An online clothing storefront inspired by Korean and Mexican football fans.',
+        media: [
+          {
+            // captured from the public site (its English view), November 6, 2026
+            src: 'assets/work/worldcup-storefront.webp',
+            width: 1440,
+            height: 900,
+            small: { src: 'assets/work/worldcup-storefront-mobile.webp', width: 780, height: 960 },
+            alt: 'Worldcup Project storefront homepage: "Pride you wear. Korea × Mexico." with View collection and How it works buttons.',
+            link: LINKS.worldcup
+          }
+        ],
         status: {
-          soFar: [FACTS.worldcupSales],
-          inProgress: []
+          done: { label: 'Result', items: [FACTS.worldcupSales] }
         },
-        story: {
-          built: todo('무엇을 만들었는가'),
-          role: todo('내가 직접 맡은 일'),
-          decisions: todo('부딪힌 문제와 바꾼 결정'),
-          outcome: todo('결과와 배운 점')
-        },
+        story: [
+          { label: 'What I built', text: 'I built an online clothing storefront inspired by the connection between Korean and Mexican football fans.' },
+          { label: 'My contribution', text: 'I built the website and helped turn the idea into products people could buy.' },
+          { label: 'Challenge and decision', text: 'The project required more than putting a website online: we had to decide what to offer and give people a reason to buy it.' },
+          { label: 'What I learned', text: 'I experienced the full path from an idea to a storefront to someone paying for what we had made.' }
+        ],
         links: [
-          { label: 'Product', url: '' },
-          { label: 'Code', url: '' },
-          { label: 'Demo', url: '' }
+          { label: 'Visit project', url: LINKS.worldcup }
         ]
       },
       {
         id: 'hebez',
         name: 'HeBeZ',
-        lede: todo('HeBeZ를 한두 문장으로'),
-        period: todo('기간'),
-        media: [],
-        mediaHint: 'HeBeZ 실제 화면',
-        status: { soFar: [], inProgress: [] },
-        story: {
-          built: todo('무엇을 만들었는가'),
-          role: todo('내가 직접 맡은 일'),
-          decisions: todo('부딪힌 문제와 바꾼 결정'),
-          outcome: todo('결과와 배운 점')
+        compact: true, // text only: no image, no link
+        role: 'Project Lead',
+        period: 'During high school',
+        lede: 'A student clothing project, from customer research to sales.',
+        status: {
+          done: { label: 'Result', items: [FACTS.hebezSales] }
         },
-        links: [
-          { label: 'Product', url: '' },
-          { label: 'Code', url: '' },
-          { label: 'Demo', url: '' }
+        story: [
+          { label: 'What I built and did', text: 'I led HeBeZ, a school clothing project covering customer research, pricing, web development, production, and sales.' },
+          { label: 'What I learned', text: 'I learned how decisions about the customer, product, website, and price had to work together before a small idea could become a sale.' }
         ]
       }
     ],
 
     about: {
-      // Paste the final self-introduction here, one string per paragraph,
-      // exactly as written. Leave the array empty until it is final.
-      paragraphs: [],
-      pendingHint: '최종 자기소개 글 — 별도 제공 예정. 문장 그대로 단락별로 붙여넣기',
+      intro: "I'm YoungSeok Lee, the sole founder of ASIV. I build with AI development tools and learn by observing work, asking questions, and changing what I make. I postponed university for a year to build ASIV.",
+      storyLabel: 'Read my story',
+      // The approved long story, one string per paragraph, exactly as written.
+      story: [
+        'An old school diary reminded me how much I had wanted to spend time with my father. By then, studying US stocks had led me to AI. I began asking whether I could use it to save him time.',
+        'My father has spent more than 17 years implementing ERP systems, the software companies use to manage purchasing, inventory, and finance. I had assumed his job was mostly installing software. Observing his work and conducting 97 interview sessions led me to the work between the screens: reconciling conflicting records, chasing missing information, and applying each company\'s rules.',
+        "I began with file and scheduling tools and voice-input experiments. At 18, I built ASIV's first products to check ERP records and approval documents, using AI development tools. I am its sole founder and handle implementation, testing, and customer discovery. My father is ASIV's ERP Domain Advisor.",
+        'In one feature, a user uploads two Excel files to a Migration section, and ASIV compares them to pinpoint the problems. The first version returned errors. Rather than patch it, I rebuilt the system with an LLM at its core and turned the original engine into an ontology it works from. I kept asking my father questions and used his feedback to add more functions.',
+        "So far, nearly 200 people have joined ASIV's waitlist for its launch, which I am targeting for November 27. I am also in discussions with several potential business customers.",
+        'Building and interviewing also changed what I wanted ASIV to do. Finding a problem creates another job for the user. Someone still has to investigate it, get approval, and confirm that the correction happened. So I decided to build ASIV around AI workers that carry those tasks through. I am now developing them to gather context, ask for missing information, execute authorized actions, and verify the result.',
+        'A consultant learns how a company operates by resolving its exceptions. I want ASIV to retain verified rules and procedures from those resolutions, so the next task does not start from scratch. We plan to start with individual ERP practitioners and expand into their teams and, eventually, the factories their systems help operate.',
+        'Before ASIV, I led HeBeZ, a school clothing project spanning customer research, web development, production, and sales. I also built Worldcup Project, an online clothing storefront inspired by the connection between Korean and Mexican football fans. That project sold around 70–80 items. These projects let me experience the whole process: deciding what to offer, building a place to sell it, and getting people to pay for something we had made.',
+        'In school, I followed the instructions for succeeding, yet I was unsure what I was succeeding at. I postponed university for a year to build ASIV. I want my technical understanding and judgment to keep up with what AI now enables me to make.',
+        'At The Academy, I want peers who will use what I build, question my assumptions, and let me do the same for them. I used to treat friendships and conversations as distractions from learning. I want them to become part of how I learn.'
+      ],
       team: [
-        { name: 'YoungSeok Lee', role: 'Solo founder' },
-        { name: 'YoungSeok’s father', role: 'ERP Domain Advisor' }
+        { name: 'YoungSeok Lee', role: 'Sole founder' },
+        { name: "YoungSeok's father", role: 'ERP Domain Advisor', note: 'More than 17 years implementing ERP systems' }
       ]
     },
 
     recognition: {
-      // Add confirmed entries only. status must be one of:
-      //   'participated' | 'selected' | 'awarded' | 'support-agreement'
-      // Example:
-      //   { year: '2026', title: 'Program name', org: 'Organiser', status: 'selected', note: '' }
-      items: [],
-      pendingHint: '확인된 활동·수상만 추가. 항목마다 실제 상태(참가 / 선정 / 수상 / 지원 약정)를 구분'
+      title: 'Learning & Recognition',
+      photo: {
+        src: 'assets/recognition/certificates-medals-1000.webp',
+        width: 1000,
+        height: 750,
+        large: { src: 'assets/recognition/certificates-medals-1536.webp', width: 1536, height: 1152 },
+        alt: 'School certificates and folders arranged in a fan, with two HME mathematics medals.',
+        caption: 'A selection of school certificates, records, and HME mathematics medals.'
+      },
+      // Confirmed entries only, worded as approved. status is shown as written;
+      // award: true gives it the accent colour.
+      items: [
+        {
+          title: 'AX Asan Local Creator Accelerator',
+          year: '2026',
+          status: 'Selected · Completed',
+          description: 'Completed the accelerator operated by Asan City and BlueMoonDream.',
+          detail: 'The program committed up to KRW 10 million in non-dilutive support.'
+        },
+        {
+          title: 'Ambition for Korea × Anthropic',
+          year: 'October 2026',
+          status: 'Selected · Participated',
+          description: 'Participated in the one-day AI hackathon in Seoul organized by Bloom in collaboration with Anthropic.'
+        },
+        {
+          title: 'Asan Office of Education — Gifted Education',
+          year: '2020–2021',
+          status: 'Selected · Completed',
+          description: 'Completed advanced middle-school programs in humanities (2020) and mathematics (2021).'
+        },
+        {
+          title: 'HME Mathematics Assessment',
+          year: '2018',
+          status: 'Award',
+          award: true,
+          description: 'Received an Excellence Award in mathematics.'
+        }
+      ]
     },
 
     contact: {
-      // Use only addresses you have confirmed. Email: 'mailto:name@example.com'
+      title: "Let's talk.",
+      line: "If you're building something, working through an ERP problem, or want to compare notes, I'd like to hear from you.",
+      email: 'LeeYoungSeok@asiv.ai.kr',
       links: [
-        { label: 'GitHub', url: '' },
-        { label: 'LinkedIn', url: '' },
-        { label: 'X', url: '' },
-        { label: 'Email', url: '' }
-      ]
+        { label: 'GitHub', url: 'https://github.com/HeBeZ7' },
+        { label: 'LinkedIn', url: 'https://www.linkedin.com/in/young-seok-lee-a3443541a/' },
+        { label: 'X', url: 'https://x.com/TbYoutuber' }
+      ],
+      location: 'Asan, South Korea'
     }
   };
 })();
