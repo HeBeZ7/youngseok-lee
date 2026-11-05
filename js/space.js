@@ -1019,6 +1019,7 @@
         }
         function next() {
           if (destroyed || failed) { gl.deleteFramebuffer(fb); return reject(new Error('SpaceScene: stopped')); }
+          if (performance.now() < quietTill) { requestAnimationFrame(next); return; }
           try {
             var tb = performance.now();
             chunk(); if (k < 24) chunk();
@@ -1048,27 +1049,34 @@
       });
     }
 
-    // one tiny draw per program into 1×1 targets with the real output layouts, so
-    // ANGLE's draw-time shader compiles happen now, off the main thread
-    function warmPrograms() {
-      var t1 = gl.createTexture(), t2 = gl.createTexture();
-      [t1, t2].forEach(function (t) {
-        gl.bindTexture(gl.TEXTURE_2D, t);
-        gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 1, 1);
+    // Heavy GPU-process work (draw-time shader compiles, bakes) stops frame
+    // production for the whole page, so it never starts inside a quiet window
+    // (the logo pop / fade-out); see scene.quietUntil().
+    var quietTill = 0;
+    function whenQuiet() {
+      return new Promise(function (resolve) {
+        function chk() {
+          if (destroyed || failed) { resolve(); return; }
+          if (performance.now() < quietTill) { requestAnimationFrame(chk); return; }
+          resolve();
+        }
+        chk();
       });
-      var fb = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t1, 0);
-      gl.viewport(0, 0, 1, 1);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-      gl.bindVertexArray(emptyVAO);
-      var d3 = gl.createTexture(); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_3D, d3); gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, 1, 1, 1);
-      var dc = gl.createTexture(); gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc); gl.texStorage2D(gl.TEXTURE_CUBE_MAP, 1, gl.RGBA8, 1, 1);
-      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc);
-      gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc);
-      var d2 = gl.createTexture(); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, d2); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 1, 1);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, d2);
-      gl.activeTexture(gl.TEXTURE0);
+    }
+    function steps(list) {
+      return list.reduce(function (pr, fn) {
+        return pr.then(function () { return whenQuiet(); }).then(function () {
+          if (destroyed || failed) return;
+          fn(); gl.flush();
+          return new Promise(function (r) { requestAnimationFrame(function () { r(); }); });
+        });
+      }, Promise.resolve());
+    }
+
+    // one tiny draw per program (one per frame) into 1×1 targets with the real
+    // output layouts, so ANGLE's draw-time shader compiles happen now
+    function warmPrograms() {
+      var t1, t2, d2, d3, dc, fb;
       function units(n) {
         var u = progs[n].u;
         gl.useProgram(progs[n].p);
@@ -1079,19 +1087,45 @@
         if (u.uTex) gl.uniform1i(u.uTex, 0);
         if (u.uWts) gl.uniform1i(u.uWts, 1);
       }
-      ['bg', 'moon', 'near', 'noise3', 'bgbake'].forEach(function (n) { units(n); gl.drawArrays(gl.TRIANGLES, 0, 3); });
-      units('star');
-      gl.bindVertexArray(farStars.vao); gl.drawArrays(gl.POINTS, 0, 1);
-      units('fig');
-      gl.bindVertexArray(figGrid.vao); gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindVertexArray(emptyVAO);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, t2, 0);
-      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
-      units('macro'); gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.deleteFramebuffer(fb);
-      gl.deleteTexture(t1); gl.deleteTexture(t2); gl.deleteTexture(d3); gl.deleteTexture(dc); gl.deleteTexture(d2);
-      return gpuDone();
+      function bindTargets(two) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t1, 0);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, two ? t2 : null, 0);
+        gl.drawBuffers(two ? [gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1] : [gl.COLOR_ATTACHMENT0]);
+        gl.viewport(0, 0, 1, 1);
+        gl.disable(gl.BLEND);
+        gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_3D, d3);
+        gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc);
+        gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc);
+        gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, d2);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, d2);
+      }
+      function draw(n, vao, mode, two) {
+        return function () {
+          bindTargets(two);
+          units(n);
+          gl.bindVertexArray(vao || emptyVAO);
+          gl.drawArrays(mode || gl.TRIANGLES, 0, mode === gl.POINTS ? 1 : 3);
+          gl.bindVertexArray(null);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        };
+      }
+      return steps([
+        function () {
+          t1 = gl.createTexture(); t2 = gl.createTexture(); d2 = gl.createTexture();
+          [t1, t2, d2].forEach(function (t) { gl.bindTexture(gl.TEXTURE_2D, t); gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 1, 1); });
+          d3 = gl.createTexture(); gl.bindTexture(gl.TEXTURE_3D, d3); gl.texStorage3D(gl.TEXTURE_3D, 1, gl.RGBA8, 1, 1, 1);
+          dc = gl.createTexture(); gl.bindTexture(gl.TEXTURE_CUBE_MAP, dc); gl.texStorage2D(gl.TEXTURE_CUBE_MAP, 1, gl.RGBA8, 1, 1);
+          fb = gl.createFramebuffer();
+        },
+        draw('moon'), draw('macro', null, null, true), draw('fig', figGrid.vao), draw('star', farStars.vao, gl.POINTS),
+        draw('bg'), draw('noise3'), draw('bgbake'), draw('near'),
+        function () {
+          gl.deleteFramebuffer(fb);
+          [t1, t2, d2, d3, dc].forEach(function (t) { gl.deleteTexture(t); });
+        }
+      ]).then(gpuDone);
     }
 
     function figUniforms() {
@@ -1960,6 +1994,8 @@
         } catch (err) { /* ignore */ }
         if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
       },
+      // intro.js: no heavy GPU work before this time (timeline clock, ms)
+      quietUntil: function (t) { quietTill = +t || 0; },
       get progress() { return e; },
       debug: {
         layers: layers,
@@ -1994,16 +2030,11 @@
         if (destroyed || failed) throw new Error('SpaceScene: stopped');
         K = 1 / PM.rx;
         resize();
-        var tw = performance.now();
-        var wp = warmPrograms();
-        slow('warm', tw);
-        return wp;
+        return warmPrograms();
       }).then(function () {
         timing.warmed = performance.now();
         if (destroyed || failed) throw new Error('SpaceScene: stopped');
-        bakeNoise();
-        bakeBg();
-        return bakeMacro();
+        return steps([bakeNoise, bakeBg]).then(bakeMacro);
       }).then(function () {
         return gpuDone();
       }).then(function () {

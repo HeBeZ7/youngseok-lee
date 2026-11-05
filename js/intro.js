@@ -407,12 +407,16 @@
     // Start once the logo and font are ready (short cap), never waiting on
     // anything below the hero.
     var sceneWait = space ? space.ready.catch(function () {}) : sceneP;
+    // keep the scene's heavy GPU work (shader warm-up, bakes) off the logo pop:
+    // an upper bound now, the exact window once t0 is known
+    if (space) space.quietUntil(now() + 900 + 32 + T.pop + T.popDur + 100);
     var started = Promise.all([logoP, fontP, sceneWait]);
     (space && CAPTURE ? started : Promise.race([started, wait(900)])).then(function () {
       if (mode !== 'intro') return;
       if (space) {
         if (glReady) glReveal(false);
         t0 = now() + 32;
+        space.quietUntil(t0 + T.pop + T.popDur + 100);
         startMark();
         glSchedule();
         return;
@@ -454,6 +458,7 @@
         out.startTime = os;
         at = Math.max(at, os + 200);
       }
+      s.quietUntil((extended && out ? out.startTime : t0 + T.out) + T.outDur + 50);
       glZoomAt = at;
       trace('gl zoom at +' + Math.round(at - t0));
       timers.push(setTimeout(function () { hero.classList.add('is-space'); }, Math.max(0, at - now())));
