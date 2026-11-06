@@ -170,9 +170,9 @@
         },
         {
           title: 'Asan Office of Education — Gifted Education',
-          year: '2020–2021',
+          year: '2020–2022',
           status: 'Selected · Completed',
-          description: 'Completed advanced middle-school programs in humanities (2020) and mathematics (2021).'
+          description: 'Completed advanced middle-school programs in humanities (2020–2021) and mathematics (2021–2022).'
         },
         {
           title: 'HME Mathematics Assessment',

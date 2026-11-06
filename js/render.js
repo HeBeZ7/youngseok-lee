@@ -371,10 +371,84 @@
     });
   })();
 
+  /* ---------- calm one-time reveal as blocks first enter the viewport ---------- */
+
+  (function reveal() {
+    // Hidden state only once JS has confirmed IntersectionObserver and motion
+    // is welcome; otherwise everything simply stays visible.
+    if (typeof window.IntersectionObserver !== 'function') return;
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var SEL = [
+      '.section-title', '.project__head', '.media', '.project__aside > .aside-title', '.status',
+      '.story__item', '.project__links', '.about__lead', '.story-toggle', '.team',
+      '.recog__item', '.contact__line', '.contact__email', '.contact-links', '.contact__place'
+    ].join(',');
+    var els = Array.prototype.slice.call(main.querySelectorAll(SEL));
+    if (!els.length) return;
+
+    // Where the visitor lands: the current scroll, or the #target that
+    // js/intro.js scrolls to (respecting scroll-padding-top, clamped to the end).
+    var doc = document.documentElement;
+    var y = window.pageYOffset || 0;
+    var vh = window.innerHeight || doc.clientHeight;
+    var landY = y;
+    if (location.hash.length > 1) {
+      var target = null;
+      try { target = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (e) {}
+      if (target) {
+        var pad = parseFloat(getComputedStyle(doc).scrollPaddingTop) || 0;
+        landY = Math.max(0, Math.min(target.getBoundingClientRect().top + y - pad, doc.scrollHeight - vh));
+      }
+    }
+
+    // Blocks in the landing view are never hidden.
+    var pending = els.filter(function (el) {
+      var r = el.getBoundingClientRect();
+      var top = r.top + y;
+      return !(top < landY + vh && top + r.height > landY);
+    });
+    if (!pending.length) return;
+
+    // Until the page has loaded (scroll restoration, font swap, the deep-link
+    // jump), anything reported in view appears at once instead of fading.
+    var instantUntil = Infinity;
+    function settle() { instantUntil = performance.now() + 300; }
+    if (document.readyState === 'complete') settle();
+    else window.addEventListener('load', settle);
+    setTimeout(function () { if (instantUntil === Infinity) instantUntil = 0; }, 2500);
+
+    function done(el) {
+      el.classList.remove('rv', 'rv-in');
+      el.style.transitionDelay = '';
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      var instant = performance.now() < instantUntil;
+      var shown = entries.filter(function (e) { return e.isIntersecting; }).map(function (e) { return e.target; });
+      shown.sort(function (a, b) { return a.compareDocumentPosition(b) & 4 ? -1 : 1; });
+      shown.forEach(function (el, i) {
+        io.unobserve(el);
+        if (instant) { done(el); return; }
+        // small stagger within what arrives together
+        var delay = Math.min(i, 5) * 70;
+        if (delay) el.style.transitionDelay = delay + 'ms';
+        el.classList.add('rv-in');
+        // drop the reveal styles afterwards: nothing keeps moving behind text
+        setTimeout(function () { done(el); }, 760 + delay + 80);
+      });
+    }, { rootMargin: '0px 0px -6% 0px', threshold: 0.01 });
+
+    pending.forEach(function (el) {
+      el.classList.add('rv');
+      io.observe(el);
+    });
+  })();
+
   /* ---------- highlight the menu item for the section in view ---------- */
 
   var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav a[href^="#"]'));
-  if ('IntersectionObserver' in window && navLinks.length) {
+  if (typeof window.IntersectionObserver === 'function' && navLinks.length) {
     var byId = {};
     navLinks.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
     var visible = {};

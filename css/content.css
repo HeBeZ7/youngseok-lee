@@ -63,7 +63,7 @@
   font: 500 15px/1.2 var(--sans);
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.25s ease;
 }
 
 .btn-out:hover,
@@ -87,8 +87,45 @@ button.media__open {
 }
 
 .media__open--site { cursor: pointer; }
-.media__open--site img { transition: opacity 0.2s ease; }
-.media__open--site:hover img { opacity: 0.9; }
+
+/* hover: a slight lift and brighten on clickable images, a nudge on buttons */
+.media__open img,
+.recog__open img { transition: filter 0.3s ease; }
+.media__open:hover img,
+.recog__open:hover img { filter: brightness(1.05); }
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .media__frame,
+  .recog__frame { transition: transform 0.4s cubic-bezier(.2, .7, .2, 1), box-shadow 0.4s ease, border-color 0.4s ease; }
+  .media__frame:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 1px var(--line-strong), 0 38px 90px -30px rgba(0, 0, 0, 0.9);
+  }
+  .recog__frame:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, 0.2); }
+  .btn-out:hover,
+  .story-toggle:hover { transform: translateY(-1px); }
+}
+
+/* ------------------------------------------------------------ scroll reveal */
+
+/* .rv is added by js/render.js only after IntersectionObserver is confirmed
+   and only to blocks outside the landing view; removed again once shown. */
+.rv {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity 0.72s cubic-bezier(.22, .61, .36, 1), transform 0.72s cubic-bezier(.22, .61, .36, 1);
+}
+
+.rv.rv-in,
+.rv:focus-within { opacity: 1; transform: none; }
+
+/* the opened story fades in */
+@keyframes story-in { from { opacity: 0; } to { opacity: 1; } }
+.about__story:not([hidden]) { animation: story-in 0.5s ease-out both; }
+
+@media print {
+  .rv { opacity: 1 !important; transform: none !important; }
+}
 
 /* --------------------------------------------- text-only project (HeBeZ) */
 
@@ -418,5 +455,8 @@ html.lb-open body { padding-right: var(--sbw, 0px); }
 @media (prefers-reduced-motion: reduce) {
   .lightbox,
   .story-toggle__icon::after,
-  .media__open--site img { transition: none; }
+  .media__open img,
+  .recog__open img { transition: none; }
+  .rv { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .about__story:not([hidden]) { animation: none; }
 }

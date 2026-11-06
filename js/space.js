@@ -647,34 +647,34 @@
     'out vec4 o;',
     'uniform sampler2D uTex, uWts;',
     'uniform vec2 uSize, uBase, uNeck;',
-    'uniform float uTime, uLife, uPxAng, uKind, uGain, uK, uFade;',
+    'uniform float uTime, uLife, uPxAng, uKind, uGain, uK, uFade, uGust;',
     'uniform vec3 uCam;',
     'void main() {',
     '  vec2 px = vUV * uSize;',
     '  vec4 w0 = texture(uWts, vUV);',
-    '  vec4 w1 = textureLod(uWts, vUV, 2.5);',
+    '  vec4 w1 = textureLod(uWts, vUV, 3.3);',
     '  vec2 off = vec2(0.0);',
     '  float t = uTime;',
     // scarf: slow travelling wave, rooted at the neck, strongest at the tip
-    '  float wr = max(w0.r, min(1.0, w1.r * 2.2));',
+    '  float wr = max(w0.r, min(1.0, w1.r * 2.8));',
     '  if (wr > 0.001 && uKind < 0.5) {',
     '    float dn = distance(px, uNeck);',
     '    float grow = smoothstep(10.0, 190.0, dn);',
     '    float sx = uNeck.x - px.x;',
     '    float ph = sx * 0.042 - t * 2.0;',
-    '    float gust = 0.8 + 0.2 * sin(t * 0.43 + 1.3);',
-    '    off += wr * grow * gust * vec2(0.8 * sin(ph * 0.5 + 0.8), 3.6 * sin(ph) + 0.9 * sin(ph * 1.9 - t * 0.7));',
+    '    float gust = (0.8 + 0.2 * sin(t * 0.43 + 1.3)) * (1.5 + 1.0 * uGust);',
+    '    off += wr * grow * gust * vec2(0.8 * sin(ph * 0.5 + 0.8), 3.6 * sin(ph) + 0.9 * sin(ph * 1.9 - t * 0.7) + 1.1 * uGust * sin(ph * 2.6 - t * 1.3));',
     '  }',
     // leaves and thin branches: tiny wind sway (trunk weight is 0)
-    '  float wg = max(w0.g, min(1.0, w1.g * 1.6));',
+    '  float wg = max(w0.g, min(1.0, w1.g * 2.0));',
     '  if (wg > 0.001) {',
     '    float ph = dot(px, vec2(0.021, 0.014));',
-    '    float gust = 0.65 + 0.35 * sin(t * 0.37 + ph * 0.3);',
+    '    float gust = (0.65 + 0.35 * sin(t * 0.37 + ph * 0.3)) * (1.6 + 1.4 * uGust);',
     '    off += wg * gust * vec2(1.4 * sin(t * 1.15 + ph) + 0.5 * sin(t * 2.3 + ph * 2.7), 0.65 * cos(t * 1.4 + ph * 1.3));',
     '  }',
     // breathing: a fraction of a pixel, anchored at the base
     '  if (w0.b > 0.001) {',
-    '    float br = sin(t * (uKind > 0.5 ? 1.75 : 1.5)) * 0.005 * w0.b;',
+    '    float br = (uKind > 0.5 ? sin(t * 1.282 + 2.1) : sin(t * 1.428)) * 0.009 * w0.b;',
     '    off += (px - uBase) * vec2(0.3, 1.0) * br;',
     '  }',
     '  vec2 uv = vUV - off * uLife / uSize;',
@@ -699,6 +699,37 @@
     '    cov = min(cov, clamp(0.5 + (mr - R1) / (tc * uPxAng), 0.0, 1.0));',
     '  }',
     '  o = c * (cov * uFade);',
+    '}'
+  ].join('\n');
+
+  // a shooting star: screen-space streak, bright head, fading tail (additive)
+  var METEOR_VS = HEAD + [
+    'uniform vec4 uSeg;',     // head.xy, tail.xy (render-target px)
+    'uniform float uHalfW;',
+    'uniform vec2 uRes;',
+    'out vec2 vT;',
+    'void main() {',
+    '  int k = gl_VertexID;',
+    '  vec2 c = vec2((k == 1 || k == 2 || k == 4) ? 1.0 : 0.0, (k == 2 || k == 4 || k == 5) ? 1.0 : -1.0);',
+    '  vec2 d = uSeg.xy - uSeg.zw; float L = max(length(d), 1.0); vec2 dir = d / L; vec2 nr = vec2(-dir.y, dir.x);',
+    '  float ext = L + uHalfW * 3.0;',
+    '  vec2 q = uSeg.zw + dir * (c.x * ext) + nr * (c.y * uHalfW * 3.0);',
+    '  vT = vec2(c.x * ext / L, c.y * 3.0);',
+    '  gl_Position = vec4(q / uRes * 2.0 - 1.0, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
+  var METEOR_FS = HEAD + [
+    'in vec2 vT;',
+    'out vec4 o;',
+    'uniform float uAlpha;',
+    'void main() {',
+    '  float al = clamp(vT.x, 0.0, 1.0);',
+    '  float tail = al * al * al * step(vT.x, 1.0) * exp(-vT.y * vT.y * 1.6);',
+    '  float hx = (vT.x - 1.0) * 14.0;',
+    '  float head = exp(-hx * hx - vT.y * vT.y * 0.9);',
+    '  float a = (tail * 0.8 + head) * uAlpha;',
+    '  o = vec4(vec3(0.93, 0.96, 1.0) * a, 1.0);',
     '}'
   ].join('\n');
 
@@ -776,6 +807,7 @@
     program('noise3', FS_VS, NOISE3_FS);
     program('bgbake', FS_VS, BGBAKE_FS);
     program('near', NEAR_VS, NEAR_FS);
+    program('meteor', METEOR_VS, METEOR_FS);
     return { progs: progs, pending: pending, parallel: parallel };
   }
 
@@ -1120,7 +1152,7 @@
           fb = gl.createFramebuffer();
         },
         draw('moon'), draw('macro', null, null, true), draw('fig', figGrid.vao), draw('star', farStars.vao, gl.POINTS),
-        draw('bg'), draw('noise3'), draw('bgbake'), draw('near'),
+        draw('bg'), draw('noise3'), draw('bgbake'), draw('near'), draw('meteor'),
         function () {
           gl.deleteFramebuffer(fb);
           [t1, t2, d2, d3, dc].forEach(function (t) { gl.deleteTexture(t); });
@@ -1155,6 +1187,7 @@
     }
 
     var bandN = norm([0.42, 0.86, 0.29]);
+    var SKY_AXIS = norm([0.25, 1, 0.15]);
 
     var KT = [];
     for (var ki = 0; ki < 64; ki++) KT.push(kelvin(3400 + 9500 * Math.pow(ki / 63, 1.6)));
@@ -1163,11 +1196,11 @@
       var sat = 0.55;
       var col = [lerp(1, k[0], sat), lerp(1, k[1], sat), lerp(1, k[2], sat)];
       var lum = 0.3 * col[0] + 0.55 * col[1] + 0.15 * col[2];
-      var tw = r() < 0.16 ? 0.25 + 0.45 * r() : 0;
+      var tw = r() < (flux > 0.45 ? 0.5 : 0.12) ? 0.3 + 0.4 * r() : 0;
       buf[o + 3] = sig;
       buf[o + 4] = col[0] / lum * flux; buf[o + 5] = col[1] / lum * flux; buf[o + 6] = col[2] / lum * flux;
       buf[o + 7] = tw;
-      buf[o + 8] = 1.6 + 5.5 * r(); buf[o + 9] = r() * TAU;
+      buf[o + 8] = (flux > 0.45 ? 1.1 + 3.2 * r() : 1.6 + 5.5 * r()); buf[o + 9] = r() * TAU;
       buf[o + 10] = 0;
     }
 
@@ -1237,7 +1270,15 @@
       return { vao: vao, buf: b, n: data.length / 11 };
     }
 
-    var farStars = starVAO(buildFar(Q.far));
+    var farData = buildFar(Q.far);
+    // three softly glinting stars in the open sky of the final view
+    [[-0.42, 0.26, -1], [0.47, 0.17, -1], [-0.28, -0.24, -1]].forEach(function (g, i) {
+      var d = norm(g), o = i * 11;
+      farData[o] = d[0]; farData[o + 1] = d[1]; farData[o + 2] = d[2]; farData[o + 3] = 0.85;
+      farData[o + 4] = 6.2; farData[o + 5] = 6.3; farData[o + 6] = 6.6; farData[o + 7] = 0.35;
+      farData[o + 8] = 3.4 + 1.3 * i; farData[o + 9] = i * 2.1; farData[o + 10] = 1;
+    });
+    var farStars = starVAO(farData);
     var midStars = starVAO(buildMid(Q.mid));
     timing.stars = performance.now();
 
@@ -1510,7 +1551,67 @@
     /* ---------- near particles ---------- */
 
     var nearP = [];
+    var METEORS = (function () {
+      var r = rng(5309), out = [], t = 2.2 + 1.6 * r();
+      for (var i = 0; i < 90; i++) {
+        var faint = r() < 0.25;
+        out.push({ t: t, dur: 0.6 + 0.6 * r(), len: (faint ? 0.55 : 1) * (80 + 160 * r()), a: faint ? 0.45 : 0.85 + 0.15 * r(), seed: 7000 + i });
+        t += (Q.far < 5000 ? 1.6 : 1) * (5 + 6 * r());
+      }
+      return out;
+    })();
+    var GUSTS = (function () {
+      var r = rng(811), out = [], t = 3 + 4 * r();
+      for (var i = 0; i < 120; i++) { var d = 1.5 + r(); out.push([t, d, 0.7 + 0.3 * r()]); t += d + 8 + 7 * r(); }
+      return out;
+    })();
+    function gustAt(t) {
+      for (var i = 0; i < GUSTS.length; i++) {
+        var g = GUSTS[i];
+        if (t < g[0]) break;
+        if (t < g[0] + g[1] + 1.2) return g[2] * smooth(0, 0.45, t - g[0]) * (1 - smooth(g[1] - 0.2, g[1] + 1.2, t - g[0]));
+      }
+      return 0;
+    }
+    // screen rect (css px) of moon + figures in the final view, kept clear of meteors
+    function contentRect() {
+      var cx = size.w / 2 - F.fpx * Math.tan(F.yaw * DEG), cy = size.h / 2 + F.fpx * Math.tan(F.pitch * DEG), R = F.R, m = 60;
+      return [cx + content.x0 * R - m, cy - content.y1 * R - m, cx + content.x1 * R + m, cy + R + m];
+    }
+    function meteorPath(mt) {
+      if (mt.path !== undefined && mt.pathKey === size.w + 'x' + size.h) return mt.path;
+      var r = rng(mt.seed), rc = contentRect(), best = null;
+      for (var tries = 0; tries < 14 && !best; tries++) {
+        var narrowS = size.w < 700;
+        var x0 = (0.04 + 0.92 * r()) * size.w, y0 = (0.03 + (narrowS ? 0.9 : 0.5) * r()) * size.h;
+        var ang = (125 + 40 * r()) * DEG;   // down-left diagonal, ±20°
+        var dx = Math.cos(ang), dy = Math.sin(ang), travel = mt.len * (narrowS ? 0.9 : 1.9);
+        var ok = true;
+        for (var k = -1; k <= 10 && ok; k++) {
+          var px = x0 + dx * travel * k / 10, py = y0 + dy * travel * k / 10;
+          if (px < 8 || py < 8 || px > size.w - 8 || py > size.h - 8) ok = false;
+          if (px > rc[0] && px < rc[2] && py > rc[1] && py < rc[3]) ok = false;
+        }
+        if (ok) best = [x0, y0, dx, dy, travel];
+      }
+      mt.path = best; mt.pathKey = size.w + 'x' + size.h;
+      return best;
+    }
+
+    var dustP = [], camF = null;
+    function buildDust() {
+      var r = rng(4441), n = Q.far < 5000 ? 5 : 8;
+      camF = camera(1);
+      dustP = [];
+      for (var i = 0; i < n; i++) {
+        dustP.push({ z: 2.2 + 7 * r(), u: r() * 2.5 - 1.25, v: (r() * 2 - 1) * 0.85,
+          vu: (r() < 0.5 ? -1 : 1) * (0.008 + 0.022 * r()), vv: (r() - 0.5) * 0.006,
+          rw: 0.009 + 0.014 * r(), a: 0.028 + 0.03 * r() });
+      }
+    }
+
     function buildNear() {
+      buildDust();
       var r = rng(771);
       nearP = [];
       var es = [0.34, 0.45, 0.55, 0.63, 0.72, 0.8];
@@ -1544,10 +1645,11 @@
       if (settled && !reduced) {
         var k = smooth(0, 1, (ts - lifeStart) / 3000);
         if (debugTime != null) k = 1;
-        x.az += k * (0.32 * Math.sin(t * TAU / 53 + 0.7) + 0.12 * Math.sin(t * TAU / 31 + 2.1));
-        x.el += k * (0.22 * Math.sin(t * TAU / 67 + 1.9) + 0.08 * Math.sin(t * TAU / 23));
-        x.az += k * ptr.sx * 0.9;
-        x.el += k * ptr.sy * 0.6;
+        x.az += k * (1.5 * Math.sin(t * TAU / 52 + 0.7) + 0.3 * Math.sin(t * TAU / 29 + 2.1));
+        x.el += k * (0.7 * Math.sin(t * TAU / 61 + 1.9) + 0.15 * Math.sin(t * TAU / 23));
+        x.dlog += k * 0.03 * Math.sin(t * TAU / 47 + 0.4);
+        x.az += k * ptr.sx * 1.4;
+        x.el += k * ptr.sy * 0.9;
       }
       // scroll: the camera eases back and up a little first
       var sp = smooth(0, 0.6, scrollS);
@@ -1654,7 +1756,13 @@
         gl.uniform1f(U.uGain, gain);
         if (layers.far) {
           var P0 = M.pv0, V0 = new Float32Array(V); V0[12] = 0; V0[13] = 0; V0[14] = 0;
-          mat(P0, P, V0);
+          var sa = reduced ? 0 : t * 0.11 * DEG, ax = SKY_AXIS, cs = Math.cos(sa), sn = Math.sin(sa), oc = 1 - cs;
+          var Rs = new Float32Array([
+            cs + ax[0] * ax[0] * oc, ax[1] * ax[0] * oc + ax[2] * sn, ax[2] * ax[0] * oc - ax[1] * sn, 0,
+            ax[0] * ax[1] * oc - ax[2] * sn, cs + ax[1] * ax[1] * oc, ax[2] * ax[1] * oc + ax[0] * sn, 0,
+            ax[0] * ax[2] * oc + ax[1] * sn, ax[1] * ax[2] * oc - ax[0] * sn, cs + ax[2] * ax[2] * oc, 0,
+            0, 0, 0, 1]);
+          mat(P0, P, mat(new Float32Array(16), V0, Rs));
           gl.uniformMatrix4fv(U.uPV, false, P0);
           gl.uniform1f(U.uW, 0);
           gl.bindVertexArray(farStars.vao);
@@ -1670,6 +1778,32 @@
       }
 
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      var lifeK = settled && !reduced ? (debugTime != null ? 1 : smooth(0, 1, (ts - lifeStart) / 3000)) : 0;
+      if (lifeK > 0 && layers.near) {
+        var tl = debugTime != null ? debugTime : (ts - lifeStart) / 1000;
+        var sx = w / size.w, sy = h / size.h, mU = null;
+        for (var mi = 0; mi < METEORS.length; mi++) {
+          var mt = METEORS[mi];
+          if (tl < mt.t) break;
+          var mu = (tl - mt.t) / mt.dur;
+          if (mu >= 1) continue;
+          var mp = meteorPath(mt);
+          if (!mp) continue;
+          if (!mU) {
+            gl.blendFunc(gl.ONE, gl.ONE);
+            gl.useProgram(progs.meteor.p); mU = progs.meteor.u;
+            gl.uniform2f(mU.uRes, w, h);
+            gl.uniform1f(mU.uHalfW, 0.9 * sx);
+          }
+          var hx = mp[0] + mp[2] * mp[4] * mu, hy = mp[1] + mp[3] * mp[4] * mu;
+          var tlen = mt.len * (size.w < 700 ? 0.5 : 1) * Math.min(1, mu / 0.3);
+          var tx = hx - mp[2] * tlen, ty = hy - mp[3] * tlen;
+          gl.uniform4f(mU.uSeg, hx * sx, (size.h - hy) * sy, tx * sx, (size.h - ty) * sy);
+          gl.uniform1f(mU.uAlpha, mt.a * lifeK * gain * smooth(0, 0.12, mu) * (1 - smooth(0.6, 1, mu)));
+          gl.drawArrays(gl.TRIANGLES, 0, 6);
+        }
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      }
       var rect = layers.moon ? moonRect(cam, tanH, aspect) : null;
       if (rect) {
         gl.useProgram(progs.moon.p); U = progs.moon.u;
@@ -1713,6 +1847,7 @@
         gl.uniform1f(U.uPxAng, pxAng);
         gl.uniform1f(U.uTime, t);
         gl.uniform1f(U.uLife, life);
+        gl.uniform1f(U.uGust, reduced ? 0 : gustAt(t));
         gl.uniform1f(U.uK, K);
         gl.uniform1f(U.uSink, 0.003);
 
@@ -1750,11 +1885,24 @@
 
       if (layers.near && !reduced) {
         var vis = smooth(0.22, 0.38, x) * (1 - smooth(0.86, 0.985, x));
+        var dustK = Math.max(lifeK, 0.6 * smooth(0.93, 1, x));
+        var list = nearP;
+        if (vis <= 0.001 && dustK > 0.001 && camF) {
+          vis = dustK;
+          list = dustP.map(function (d) {
+            var span = 2.5, uu = d.u + d.vu * t;
+            uu = ((uu + 1.25) % span + span) % span - 1.25;
+            var vv = d.v + d.vv * Math.sin(t * 0.05 + d.z);
+            var fade = 1 - smooth(1.0, 1.25, Math.abs(uu));
+            var q = add(camF.pos, add(add(mul(camF.right, uu * d.z * tanH * aspect), mul(camF.up, vv * d.z * tanH)), mul(camF.fwd, d.z)));
+            return { p: q, rw: d.rw * d.z, a: d.a * fade };
+          });
+        }
         if (vis > 0.001) {
           gl.blendFunc(gl.ONE, gl.ONE);
           gl.useProgram(progs.near.p); U = progs.near.u;
           var pa = new Float32Array(32), aa = new Float32Array(8);
-          nearP.forEach(function (q, i) {
+          list.forEach(function (q, i) {
             pa[i * 4] = q.p[0]; pa[i * 4 + 1] = q.p[1]; pa[i * 4 + 2] = q.p[2]; pa[i * 4 + 3] = q.rw;
             // hidden if the moon is in front
             var rd = sub(q.p, cam.pos), tf = len(rd); rd = mul(rd, 1 / tf);
@@ -1768,7 +1916,7 @@
           gl.uniform3fv(U.uCam, cam.pos);
           gl.uniform2f(U.uRes, w, h);
           gl.uniform1f(U.uFpx, (h / 2) / tanH);
-          gl.drawArrays(gl.TRIANGLES, 0, nearP.length * 6);
+          gl.drawArrays(gl.TRIANGLES, 0, list.length * 6);
         }
       }
       gl.bindVertexArray(null);
@@ -2002,6 +2150,7 @@
         stats: stats,
         timing: timing,
         get renderScale() { return rscale; },
+        get meteors() { return METEORS.slice(0, 6).map(function (m) { return { t: m.t, dur: m.dur, path: meteorPath(m) }; }); },
         quality: Q,
         get framing() { return F; },
         get content() { return content; },
