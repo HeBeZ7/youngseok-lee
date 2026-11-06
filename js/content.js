@@ -143,43 +143,49 @@
     },
 
     recognition: {
-      title: 'Learning & Recognition',
+      title: 'Education & Recognition',
       photo: {
         src: 'assets/recognition/certificates-medals-1000.webp',
         width: 1000,
         height: 750,
         large: { src: 'assets/recognition/certificates-medals-1536.webp', width: 1536, height: 1152 },
         alt: 'School certificates and folders arranged in a fan, with two HME mathematics medals.',
-        caption: 'A selection of school certificates, records, and HME mathematics medals.'
+        caption: 'I received 79 awards across school and external competitions during middle and high school. Pictured here are selected school certificates and records, alongside HME mathematics medals from my earlier years.'
       },
-      // Confirmed entries only, worded as approved. status is shown as written;
-      // award: true gives it the accent colour.
+      // Confirmed entries only, worded as approved, in this order.
+      // meta is the quiet label above each title, shown as written:
+      // [when, status] renders "when · status"; a single item renders alone.
       items: [
         {
+          meta: ['2026', 'Selected & Completed'],
           title: 'AX Asan Local Creator Accelerator',
-          year: '2026',
-          status: 'Selected · Completed',
-          description: 'Completed the accelerator operated by Asan City and BlueMoonDream.',
-          detail: 'The program committed up to KRW 10 million in non-dilutive support.'
+          description: 'Selected for and completed the accelerator operated by Asan City and BlueMoonDream. The program committed up to KRW 10 million in non-dilutive support for ASIV, helping me turn ERP field research into a working product.'
         },
         {
+          meta: ['October 2026', 'Selected & Participated'],
           title: 'Ambition for Korea × Anthropic',
-          year: 'October 2026',
-          status: 'Selected · Participated',
-          description: 'Participated in the one-day AI hackathon in Seoul organized by Bloom in collaboration with Anthropic.'
+          description: 'Selected as one of 100 participants from about 1,000 applicants. Participated in the one-day AI hackathon in Seoul, organized by Bloom in collaboration with Anthropic.'
         },
         {
+          meta: ['Filed', 'Three Applications'],
+          title: 'Patent Applications',
+          description: 'Filed three patent applications during ASIV’s development, alongside building the product, conducting customer interviews, and testing its behavior.'
+        },
+        {
+          meta: ['2023–2026', 'Graduated'],
+          title: 'Chungnam Foreign Language High School (CFLHS)',
+          description: 'Graduated from the Chinese language track. I postponed university for a year to build ASIV, teaching myself software development through the problems I encountered while building it.'
+        },
+        {
+          meta: ['2020–2022', 'Selected & Completed'],
           title: 'Asan Office of Education — Gifted Education',
-          year: '2020–2022',
-          status: 'Selected · Completed',
-          description: 'Completed advanced middle-school programs in humanities (2020–2021) and mathematics (2021–2022).'
+          description: 'Selected for advanced middle-school programs in humanities (2020–2021) and mathematics (2021–2022), completing both. My mathematics studies included calculus while I was still in middle school.'
         },
         {
+          // no year on this entry
+          meta: ['Awarded'],
           title: 'HME Mathematics Assessment',
-          year: '2018',
-          status: 'Award',
-          award: true,
-          description: 'Received an Excellence Award in mathematics.'
+          description: 'Received Top Excellence, Excellence, and Encouragement awards in the HME Mathematics Assessment.'
         }
       ]
     },

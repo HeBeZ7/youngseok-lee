@@ -24,9 +24,16 @@
       .replace(/"/g, '&quot;');
   }
 
+  // Visible text: escaped, and number ranges such as "(2020–2021)", "2023–2026"
+  // or "70–80" kept on one line. Not for attributes (alt, data-*).
+  var RANGE = /\(?\d{2,4}–\d{2,4}\)?/g;
+  function txt(s) {
+    return esc(s).replace(RANGE, '<span class="nowrap">$&</span>');
+  }
+
   // **bold** only; everything else is plain text.
   function rich(s) {
-    return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    return txt(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   }
 
   function has(v) { return typeof v === 'string' && v.trim() !== ''; }
@@ -87,7 +94,7 @@
       }
       return '<figure class="media' + (p.featured ? ' media--featured' : '') + '">' +
         '<div class="media__frame">' + inner + '<span class="media__fallback">Image unavailable</span></div>' +
-        (has(m.caption) ? '<figcaption>' + esc(m.caption) + '</figcaption>' : '') +
+        (has(m.caption) ? '<figcaption>' + txt(m.caption) + '</figcaption>' : '') +
         '</figure>';
     }).join('');
   }
@@ -98,7 +105,7 @@
     if (!g || !g.items || !g.items.length) return '';
     return '<div class="status__group' + (open ? ' status__group--open' : '') + '">' +
       '<p class="status__label">' + esc(g.label) + '</p><ul class="status__list">' +
-      g.items.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul></div>';
+      g.items.map(function (f) { return '<li>' + txt(f) + '</li>'; }).join('') + '</ul></div>';
   }
 
   function status(p) {
@@ -130,9 +137,9 @@
       : esc(p.name);
 
     var head = '<header class="project__head">' +
-      '<p class="project__index"><span>' + num + '</span>' + (has(p.period) ? '<span>' + esc(p.period) + '</span>' : '') + '</p>' +
+      '<p class="project__index"><span>' + num + '</span>' + (has(p.period) ? '<span>' + txt(p.period) + '</span>' : '') + '</p>' +
       '<h3 class="project__title" id="p-' + esc(p.id) + '">' + title + '</h3>' +
-      (has(p.lede) ? '<p class="project__lede">' + esc(p.lede) + '</p>' : '') +
+      (has(p.lede) ? '<p class="project__lede">' + txt(p.lede) + '</p>' : '') +
       (has(p.role) ? '<p class="project__role"><span class="project__role-label">Role</span><span>' + esc(p.role) + '</span></p>' : '') +
       '</header>';
 
@@ -178,7 +185,7 @@
 
     var team = (a.team || []).map(function (m) {
       return '<li><span class="team__name">' + esc(m.name) + '</span><span class="team__role">' + esc(m.role) + '</span>' +
-        (has(m.note) ? '<span class="team__note">' + esc(m.note) + '</span>' : '') + '</li>';
+        (has(m.note) ? '<span class="team__note">' + txt(m.note) + '</span>' : '') + '</li>';
     }).join('');
 
     return '<section class="section section--about" id="about" aria-labelledby="h-about"><div class="wrap about">' +
@@ -214,24 +221,33 @@
         '</button>' +
         '<span class="media__fallback">Image unavailable</span>' +
         '</div>' +
-        (has(ph.caption) ? '<figcaption>' + esc(ph.caption) + '</figcaption>' : '') +
+        (has(ph.caption) ? '<figcaption>' + txt(ph.caption) + '</figcaption>' : '') +
         '</figure>';
     }
 
+    // quiet label above each title: "when · status", or a single label as written
+    function meta(m) {
+      m = (m || []).filter(has);
+      if (!m.length) return '';
+      var status = m[m.length - 1];
+      var when = m.length > 1 ? m.slice(0, -1).join(' · ') : '';
+      return '<p class="recog__meta">' +
+        (when ? '<span class="recog__when">' + txt(when) + '</span> · ' : '') +
+        '<span class="recog__status">' + txt(status) + '</span></p>';
+    }
+
     var list = items.length ? '<ol class="recog__list">' + items.map(function (it) {
-      return '<li class="recog__item">' +
-        '<p class="recog__meta"><span class="recog__year">' + esc(it.year || '') + '</span>' +
-        (has(it.status) ? '<span class="recog__status' + (it.award ? ' recog__status--award' : '') + '">' + esc(it.status) + '</span>' : '') +
-        '</p>' +
-        '<h3 class="recog__title">' + esc(it.title) + '</h3>' +
-        (has(it.description) ? '<p class="recog__desc">' + esc(it.description) + '</p>' : '') +
-        (has(it.detail) ? '<p class="recog__detail">' + esc(it.detail) + '</p>' : '') +
+      return '<li class="recog__item">' + meta(it.meta) +
+        '<h3 class="recog__title">' + txt(it.title) + '</h3>' +
+        (has(it.description) ? '<p class="recog__desc">' + txt(it.description) + '</p>' : '') +
+        (has(it.detail) ? '<p class="recog__detail">' + txt(it.detail) + '</p>' : '') +
         '</li>';
     }).join('') + '</ol>' : '';
 
     return '<section class="section section--recognition" id="recognition" aria-labelledby="h-record"><div class="wrap">' +
-      '<h2 class="section-title section-title--sub" id="h-record">' + esc(r.title || 'Learning & Recognition') + '</h2>' +
-      '<div class="recog' + (photo ? '' : ' recog--text') + '">' + photo + list + '</div>' +
+      '<h2 class="section-title section-title--sub" id="h-record">' + esc(r.title || 'Education & Recognition') + '</h2>' +
+      '<div class="recog' + (photo ? '' : ' recog--text') + '">' +
+      (photo ? '<div class="recog__aside">' + photo + '</div>' : '') + list + '</div>' +
       '</div></section>';
   }
 
@@ -242,7 +258,7 @@
     var links = realLinks(c.links);
     return '<section class="section section--contact" id="contact" aria-labelledby="h-contact"><div class="wrap contact">' +
       '<h2 class="section-title" id="h-contact">' + esc(c.title || 'Contact') + '</h2>' +
-      (has(c.line) ? '<p class="contact__line">' + esc(c.line) + '</p>' : '') +
+      (has(c.line) ? '<p class="contact__line">' + txt(c.line) + '</p>' : '') +
       (has(c.email) ? '<p class="contact__email"><a class="link-out" href="mailto:' + esc(c.email) + '">' +
         '<span class="sr-only">Email: </span><span>' + esc(c.email) + '</span>' +
         '<span class="link-out__arrow" aria-hidden="true">→</span></a></p>' : '') +
