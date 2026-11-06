@@ -116,6 +116,8 @@ button.media__open {
 .rv {
   opacity: 0;
   transform: translate3d(0, 16px, 0);
+  /* own layer while pending/revealing: rastered ahead of view, animated on the compositor */
+  will-change: opacity, transform;
   transition: opacity 0.72s cubic-bezier(.22, .61, .36, 1), transform 0.72s cubic-bezier(.22, .61, .36, 1);
 }
 

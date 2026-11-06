@@ -439,6 +439,21 @@
       el.style.transitionDelay = '';
     }
 
+    // Pending blocks are pre-promoted (will-change in css/content.css), so starting a
+    // reveal is a compositor-only change: no new layer or raster on the frames where
+    // a block appears. Finished blocks keep their layer until the page has been still
+    // for a moment, then all are merged back in one go, so the re-layering and
+    // re-raster never land in the middle of a scroll.
+    var finished = [];
+    var flushTimer = 0;
+    var idleCb = window.requestIdleCallback || function (fn) { return setTimeout(fn, 1); };
+    function flush() { flushTimer = 0; finished.splice(0).forEach(done); }
+    function scheduleFlush() {
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(function () { idleCb(flush, { timeout: 1000 }); }, 900);
+    }
+    window.addEventListener('scroll', function () { if (finished.length) scheduleFlush(); }, { passive: true });
+
     var io = new IntersectionObserver(function (entries) {
       var instant = performance.now() < instantUntil;
       var shown = entries.filter(function (e) { return e.isIntersecting; }).map(function (e) { return e.target; });
@@ -450,8 +465,9 @@
         var delay = Math.min(i, 5) * 70;
         if (delay) el.style.transitionDelay = delay + 'ms';
         el.classList.add('rv-in');
-        // drop the reveal styles afterwards: nothing keeps moving behind text
-        setTimeout(function () { done(el); }, 760 + delay + 80);
+        // drop the reveal styles afterwards (batched, once scrolling has stopped);
+        // nothing keeps moving behind text in the meantime
+        setTimeout(function () { finished.push(el); scheduleFlush(); }, 760 + delay + 80);
       });
     }, { rootMargin: '0px 0px -6% 0px', threshold: 0.01 });
 
