@@ -461,6 +461,49 @@
     });
   })();
 
+  /* ---------- warm-up: decode the body images while the page is idle ---------- */
+
+  // Otherwise each image is fetched (they are lazy) and decoded the first time it is
+  // drawn, i.e. in the middle of the first scroll into Selected Work (decodes of
+  // 50–120 ms on the frames where it appears). Do it once, one image after another,
+  // after the opening has settled and the page is idle.
+  (function warmUp() {
+    var root = document.documentElement;
+    var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 1); };
+    var started = false;
+
+    function warmImages() {
+      var chain = Promise.resolve();
+      Array.prototype.forEach.call(main.querySelectorAll('img'), function (img) {
+        chain = chain.then(function () {
+          return new Promise(function (resolve) {
+            var finished = false;
+            function next() { if (!finished) { finished = true; setTimeout(resolve, 60); } }
+            function decode() { (img.decode ? img.decode() : Promise.resolve()).then(next, next); }
+            setTimeout(next, 8000); // never hold up the chain
+            if (img.loading === 'lazy') img.loading = 'eager';
+            if (img.complete && img.naturalWidth) decode();
+            else { img.addEventListener('load', decode, { once: true }); img.addEventListener('error', next, { once: true }); }
+          });
+        });
+      });
+    }
+
+    function start() {
+      if (started) return;
+      started = true;
+      warmImages();
+    }
+
+    // after load, once the opening has settled (js/intro.js adds html.settled)
+    function whenSettled() {
+      if (!root.classList.contains('settled')) { setTimeout(whenSettled, 250); return; }
+      setTimeout(function () { idle(start, { timeout: 1500 }); }, 400);
+    }
+    if (document.readyState === 'complete') whenSettled();
+    else window.addEventListener('load', whenSettled);
+  })();
+
   /* ---------- highlight the menu item for the section in view ---------- */
 
   var navLinks = Array.prototype.slice.call(document.querySelectorAll('.nav a[href^="#"]'));

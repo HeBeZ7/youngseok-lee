@@ -241,6 +241,7 @@
   var STAR_VS = HEAD + [
     'uniform mat4 uPV;',
     'uniform float uW, uPx, uTime, uGain;',
+    'uniform mat3 uSky;',
     'in vec4 a0;',   // xyz (direction or position), sigma (css px)
     'in vec4 a1;',   // rgb flux, twinkle amount
     'in vec2 a2;',   // twinkle period (s), phase
@@ -248,7 +249,9 @@
     'out vec3 vCol;',
     'out vec3 vK;',
     'void main() {',
-    '  vec4 c = uPV * vec4(a0.xyz, uW);',
+    // the slow sky rotation; sparkle stars stay fixed in the open sky
+    '  vec3 pp = (uW < 0.5 && a3 < 0.97) ? uSky * a0.xyz : a0.xyz;',
+    '  vec4 c = uPV * vec4(pp, uW);',
     '  if (uW < 0.5) c.z = c.w * 0.99999;',
     '  gl_Position = c;',
     '  float sig = max(a0.w * uPx, 0.62);',
@@ -268,7 +271,8 @@
     'void main() {',
     '  vec2 q = (gl_PointCoord - 0.5) * vK.x;',
     '  float r2 = dot(q, q);',
-    '  float g = exp(-0.5 * r2) + vK.y * 0.045 * exp(-0.5 * r2 / 30.0);',
+    '  float g = exp(-0.5 * r2) + vK.y * 0.07 * exp(-0.5 * r2 / 30.0);',
+    '  if (vK.y > 0.97) g += 0.22 * (exp(-abs(q.y) * 1.8 - abs(q.x) * 0.3) + exp(-abs(q.x) * 1.8 - abs(q.y) * 0.3));',
     '  o = vec4(vCol * g, 1.0);',
     '}'
   ].join('\n');
@@ -321,7 +325,7 @@
     'uniform vec2 uRes;',
     'void main() {',
     '  vec4 t = texture(uBg, normalize(vRay));',
-    '  float v = (0.3 + 1.3 * t.r + 3.0 * t.g) / 255.0 * uGain;',
+    '  float v = (0.3 + 1.3 * t.r + 4.6 * t.g) / 255.0 * uGain;',
     '  vec3 col = v * vec3(0.94, 0.97, 1.04);',
     '  col *= smoothstep(0.0, 0.25, gl_FragCoord.y / uRes.y);',
     '  o = vec4(max(col + dither(gl_FragCoord.xy), 0.0), 1.0);',
@@ -728,7 +732,8 @@
     '  float tail = al * al * al * step(vT.x, 1.0) * exp(-vT.y * vT.y * 1.6);',
     '  float hx = (vT.x - 1.0) * 14.0;',
     '  float head = exp(-hx * hx - vT.y * vT.y * 0.9);',
-    '  float a = (tail * 0.8 + head) * uAlpha;',
+    '  float glow = exp(-hx * hx / 10.0 - vT.y * vT.y * 0.12) * 0.4;',
+    '  float a = (tail * 0.9 + head * 1.7 + glow) * uAlpha;',
     '  o = vec4(vec3(0.93, 0.96, 1.0) * a, 1.0);',
     '}'
   ].join('\n');
@@ -777,8 +782,8 @@
   function tier(forceMobile) {
     var mobile = forceMobile != null ? !!forceMobile : isMobile();
     return mobile
-      ? { dprCap: 1.35, budget: 0.8e6, far: 3000, mid: 160, craterOct: 11, microOct: 7, bake: 384, bakeOct: 3 }
-      : { dprCap: 1.5, budget: 2.2e6, far: 7500, mid: 380, craterOct: 12, microOct: 8, bake: 384, bakeOct: 3 };
+      ? { dprCap: 1.35, budget: 0.8e6, far: 7000, mid: 320, craterOct: 11, microOct: 7, bake: 384, bakeOct: 3 }
+      : { dprCap: 1.5, budget: 2.2e6, far: 9000, mid: 520, craterOct: 12, microOct: 8, bake: 384, bakeOct: 3 };
   }
 
   function compileAll(gl) {
@@ -835,8 +840,8 @@
     if (opts.quality) for (var qk in opts.quality) Q[qk] = opts.quality[qk];
 
     var Qunused = false
-      ? { dprCap: 1.35, budget: 0.8e6, far: 3000, mid: 160, craterOct: 11, microOct: 7, bake: 384, bakeOct: 3 }
-      : { dprCap: 1.5, budget: 2.2e6, far: 7500, mid: 380, craterOct: 12, microOct: 8, bake: 384, bakeOct: 3 };
+      ? { dprCap: 1.35, budget: 0.8e6, far: 7000, mid: 320, craterOct: 11, microOct: 7, bake: 384, bakeOct: 3 }
+      : { dprCap: 1.5, budget: 2.2e6, far: 9000, mid: 520, craterOct: 12, microOct: 8, bake: 384, bakeOct: 3 };
 
     var capture = opts.capture != null ? !!opts.capture : /[?&]capture=1(&|$)/.test(location.search);
     var canvas, gl = null, cpReuse = null;
@@ -1196,7 +1201,7 @@
       var sat = 0.55;
       var col = [lerp(1, k[0], sat), lerp(1, k[1], sat), lerp(1, k[2], sat)];
       var lum = 0.3 * col[0] + 0.55 * col[1] + 0.15 * col[2];
-      var tw = r() < (flux > 0.45 ? 0.5 : 0.12) ? 0.3 + 0.4 * r() : 0;
+      var tw = r() < (flux > 0.3 ? 0.75 : 0.25) ? 0.5 + 0.42 * r() : 0;
       buf[o + 3] = sig;
       buf[o + 4] = col[0] / lum * flux; buf[o + 5] = col[1] / lum * flux; buf[o + 6] = col[2] / lum * flux;
       buf[o + 7] = tw;
@@ -1223,11 +1228,12 @@
         buf[o] = d[0]; buf[o + 1] = d[1]; buf[o + 2] = d[2];
         var x = r();
         // strongly skewed: most barely visible, a few clearly brighter, a handful with a soft glow
-        var flux = inBand ? 0.035 + 0.4 * Math.pow(x, 8) : 0.05 + 2.0 * Math.pow(x, 11);
-        var glow = 0;
-        if (!inBand && r() < 0.004) { flux = 2.5 + 3.5 * r(); glow = 0.6 + 0.4 * r(); }
-        var sig = 0.4 + 0.42 * Math.pow(Math.min(flux, 4) / 4, 0.6) + 0.12 * r();
-        starAttrs(r, flux * 2.4, sig, buf, o);
+        var flux = inBand ? 0.07 + 0.6 * Math.pow(x, 6) : 0.14 + 2.6 * Math.pow(x, 7);
+        var glow = 0, gq = r();
+        if (!inBand && gq < 0.005) { flux = 3.5 + 4 * r(); glow = 0.8 + 0.15 * r(); }
+        else if (!inBand && gq < 0.075) { flux = Math.max(flux, 0.9 + 1.3 * r()); glow = 0.25 + 0.2 * r(); }
+        var sig = 0.62 + 0.75 * Math.pow(Math.min(flux, 6) / 6, 0.6) + 0.2 * r();
+        starAttrs(r, flux * 4.0, sig, buf, o);
         buf[o + 10] = glow;
       }
       return buf;
@@ -1249,9 +1255,9 @@
         }
         var dist = 25 * Math.pow(6, r());
         buf[o] = d[0] * dist; buf[o + 1] = d[1] * dist; buf[o + 2] = d[2] * dist;
-        var flux = (0.05 + 1.8 * Math.pow(r(), 9)) * Math.pow(40 / dist, 0.5);
-        var sig = 0.42 + 0.35 * Math.min(1, flux / 1.5) + 0.1 * r();
-        starAttrs(r, flux * 2.4, sig, buf, o);
+        var flux = (0.12 + 2.4 * Math.pow(r(), 6)) * Math.pow(40 / dist, 0.5);
+        var sig = 0.62 + 0.55 * Math.min(1, flux / 1.5) + 0.15 * r();
+        starAttrs(r, flux * 4.0, sig, buf, o);
       }
       return buf;
     }
@@ -1277,6 +1283,13 @@
       farData[o] = d[0]; farData[o + 1] = d[1]; farData[o + 2] = d[2]; farData[o + 3] = 0.85;
       farData[o + 4] = 6.2; farData[o + 5] = 6.3; farData[o + 6] = 6.6; farData[o + 7] = 0.35;
       farData[o + 8] = 3.4 + 1.3 * i; farData[o + 9] = i * 2.1; farData[o + 10] = 1;
+    });
+    [[-0.36, 0.2], [-0.24, 0.27], [-0.42, -0.06], [-0.3, -0.21], [-0.14, -0.27], [0.33, 0.23], [0.4, 0.05],
+     [0.27, -0.18], [0.44, -0.24], [0.18, 0.29], [-0.47, 0.1], [0.36, -0.08]].forEach(function (g, i) {
+      var d = norm([g[0], g[1], -1]), o = (3 + i) * 11, b = 5 + 4 * ((i * 37) % 7) / 7;
+      farData[o] = d[0]; farData[o + 1] = d[1]; farData[o + 2] = d[2]; farData[o + 3] = 1.05 + 0.25 * ((i * 53) % 5) / 5;
+      farData[o + 4] = b; farData[o + 5] = b * 1.01; farData[o + 6] = b * 1.06; farData[o + 7] = 0.3;
+      farData[o + 8] = 3.5 + (i % 4) * 1.3; farData[o + 9] = i * 1.7; farData[o + 10] = 1;
     });
     var farStars = starVAO(farData);
     var midStars = starVAO(buildMid(Q.mid));
@@ -1552,11 +1565,11 @@
 
     var nearP = [];
     var METEORS = (function () {
-      var r = rng(5309), out = [], t = 2.2 + 1.6 * r();
+      var r = rng(5309), out = [], t = 1.6 + 0.8 * r();
       for (var i = 0; i < 90; i++) {
         var faint = r() < 0.25;
-        out.push({ t: t, dur: 0.6 + 0.6 * r(), len: (faint ? 0.55 : 1) * (80 + 160 * r()), a: faint ? 0.45 : 0.85 + 0.15 * r(), seed: 7000 + i });
-        t += (Q.far < 5000 ? 1.6 : 1) * (5 + 6 * r());
+        out.push({ t: t, dur: 0.7 + 0.6 * r(), len: (faint ? 0.6 : 1) * (150 + 170 * r()), a: faint ? 0.6 : 1.0 + 0.2 * r(), seed: 7000 + i });
+        t += Q.dprCap < 1.4 ? 5 + 4 * r() : 4 + 4 * r();
       }
       return out;
     })();
@@ -1600,13 +1613,13 @@
 
     var dustP = [], camF = null;
     function buildDust() {
-      var r = rng(4441), n = Q.far < 5000 ? 5 : 8;
+      var r = rng(4441), n = Q.dprCap < 1.4 ? 5 : 8;
       camF = camera(1);
       dustP = [];
       for (var i = 0; i < n; i++) {
         dustP.push({ z: 2.2 + 7 * r(), u: r() * 2.5 - 1.25, v: (r() * 2 - 1) * 0.85,
           vu: (r() < 0.5 ? -1 : 1) * (0.008 + 0.022 * r()), vv: (r() - 0.5) * 0.006,
-          rw: 0.009 + 0.014 * r(), a: 0.028 + 0.03 * r() });
+          rw: 0.0035 + 0.0055 * r(), a: 0.022 + 0.02 * r() });
       }
     }
 
@@ -1762,7 +1775,8 @@
             ax[0] * ax[1] * oc - ax[2] * sn, cs + ax[1] * ax[1] * oc, ax[2] * ax[1] * oc + ax[0] * sn, 0,
             ax[0] * ax[2] * oc + ax[1] * sn, ax[1] * ax[2] * oc - ax[0] * sn, cs + ax[2] * ax[2] * oc, 0,
             0, 0, 0, 1]);
-          mat(P0, P, mat(new Float32Array(16), V0, Rs));
+          mat(P0, P, V0);
+          gl.uniformMatrix3fv(U.uSky, false, new Float32Array([Rs[0], Rs[1], Rs[2], Rs[4], Rs[5], Rs[6], Rs[8], Rs[9], Rs[10]]));
           gl.uniformMatrix4fv(U.uPV, false, P0);
           gl.uniform1f(U.uW, 0);
           gl.bindVertexArray(farStars.vao);
@@ -1793,10 +1807,10 @@
             gl.blendFunc(gl.ONE, gl.ONE);
             gl.useProgram(progs.meteor.p); mU = progs.meteor.u;
             gl.uniform2f(mU.uRes, w, h);
-            gl.uniform1f(mU.uHalfW, 0.9 * sx);
+            gl.uniform1f(mU.uHalfW, 1.3 * sx);
           }
           var hx = mp[0] + mp[2] * mp[4] * mu, hy = mp[1] + mp[3] * mp[4] * mu;
-          var tlen = mt.len * (size.w < 700 ? 0.5 : 1) * Math.min(1, mu / 0.3);
+          var tlen = mt.len * (size.w < 700 ? 0.55 : 1) * Math.min(1, mu / 0.3);
           var tx = hx - mp[2] * tlen, ty = hy - mp[3] * tlen;
           gl.uniform4f(mU.uSeg, hx * sx, (size.h - hy) * sy, tx * sx, (size.h - ty) * sy);
           gl.uniform1f(mU.uAlpha, mt.a * lifeK * gain * smooth(0, 0.12, mu) * (1 - smooth(0.6, 1, mu)));
